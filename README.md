@@ -8,6 +8,8 @@ joytest65 is written using the [Acme cross-assembler](https://sourceforge.net/pr
 
 If you are writing a game in BASIC 65, see the [User's Guide](https://files.mega65.org/?id=a5081244-a976-4a21-9153-27cca13fd613) for information about the `JOY()` and `POT()` functions.
 
+* 2020-10-21, v0.1: Initial release. Lots of sloppy inefficient code, but hopefully the `read_joystick_ports` routine is clear enough.
+
 ## One-button joysticks
 
 A one-button joystick contains five buttons: up, down, left, right, and fire. The joystick is built such that pressing the stick in a diagonal direction presses two buttons simultaneously, such as up and left, for a total of eight possible directions. All five buttons can be read independently by the computer.
@@ -43,8 +45,8 @@ Each paddle dial is also assigned to a pin. The dial is a *potentiometer,* an el
 
 | Pin | Function | CIA bit (0=pressed) |
 |-----|----------|---------|
-| 2 | Paddle A fire | 1 |
-| 3 | Paddle B fire | 2 |
+| 3 | Paddle A fire | 2 |
+| 4 | Paddle B fire | 3 |
 | 5 | Paddle A dial (POTX) | - |
 | 7 | +5V | - |
 | 8 | Ground | - |

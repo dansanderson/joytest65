@@ -27,12 +27,10 @@ init:
     sta $d705
 
 loop:
-    inc $d020
     jsr read_joystick_ports
-    dec $d020
     jsr update_display
 
-    ; Wait to a spot in the frame
+    ; Sync raster for cleaner screen updates
 -   lda $d012
     cmp #$ff
     bne -
@@ -114,6 +112,170 @@ disp:
 ++
 }
 
+make_screen_addr:
+    ; Input: $fc-$fd: screen offset
+    ; Output: $fc-$ff: screen address + offset
+    lda $d060
+    clc
+    adc $fc
+    sta $fc
+    lda $d061
+    adc $fd
+    sta $fd
+    lda $d062
+    adc #$00
+    sta $fe
+    lda $d063
+    and #$0f
+    sta $ff   ; [$fc] = char address
+    rts
+
+disp_byte_dec:
+    ; $fc-$fd: screen offset
+    ; A: byte value to print: three digit unsigned decimal
+    sta $1600
+    lda #0
+    sta $1601
+    sta $1602
+    sta $1603
+    jsr make_screen_addr
+
+    ; Calculate three-digit BCD in $1601-$1602 ($0x $yz)
+    sed
+    ldx #8
+-   rol $1600
+    ldy #2
+--  lda $1600,y
+    adc $1600,y
+    sta $1600,y
+    dey
+    bne --
+    dex
+    bne -
+    cld
+
+    ; DEBUG
+    ; 128 -> $1601:$01 $1602:$28
+;     lda $1601
+;     cmp #$01
+;     bne +
+;     brk
+; +
+
+    ; Plot screen codes
+    lda $1601
+    jsr hex_az
+    ldz #0
+    sta [$fc],z
+    lda $1602
+    jsr hex_az
+    pha
+    tza
+    ldz #1
+    sta [$fc],z
+    pla
+    inz
+    sta [$fc],z
+
+    rts
+
+; Input: A = byte
+; Output: A/Z = hex digit screen codes
+hex_az:
+    pha
+    lsr
+    lsr
+    lsr
+    lsr
+    jsr hex_nyb
+    taz
+    pla
+
+hex_nyb:
+    and #15
+    cmp #10
+    bcs +
+    adc #48 ; (carry clear)
+    bra ++
++   sbc #9  ; (carry set)
+++  rts
+
+disp_byte_hex:
+    ; $fc-$fd: screen offset
+    ; A: byte value to print: two digit unsigned hexadecimal
+    pha
+    jsr make_screen_addr
+    pla
+    jsr hex_az
+    phz
+    ldz #1
+    sta [$fc],z
+    pla
+    dez
+    sta [$fc],z
+
+    rts
+
+disp_byte_bin5:
+    ; $fc-$fd: screen offset
+    ; A: byte value to print: lowest 5 binary digits
+    pha
+    jsr make_screen_addr
+    pla
+    rol
+    rol
+    rol
+
+    ldz #0
+-   rol
+    pha
+    bcc +
+    lda #49  ; screen code '1'
+    bra ++
++   lda #48  ; screen code '0'
+++  sta [$fc],z
+    pla
+    inz
+    cpz #5
+    bne -
+
+    rts
+
+joyfunc_dirs:
+!byte %1111, %1110, %0110, %0111, %0101, %1101, %1001, %1011, %1010
+
+calc_joyfunc:
+    ; Input: A=CIA bits
+    ; Output: A=JOY()
+    tax
+    and #%00010000
+    bne +
+    lda #$80
+    bra ++
++   lda #$00
+++  sta $1600
+    txa
+
+    and #%00001111
+    ldx #0
+-   cmp joyfunc_dirs,x
+    beq ++
+    inx
+    cpx #9
+    bne -
+    ldx #0
+++  txa
+
+    clc
+    adc $1600
+    rts
+
+disp_paddle_bar:
+    ; Input: $fc-$fd = screen offset; A = paddle value
+    ; TODO
+    rts
+
+
 update_display:
 
     lda #joy1_offset
@@ -186,12 +348,159 @@ update_display:
 +   +disp_indicator joy_b3_on
 ++
 
-    ; TODO: write joy bits
-    ; TODO: write joy hex
-    ; TODO: write joy basfunc dec
-    ; TODO: write paddle hex
-    ; TODO: write paddle dec
-    ; TODO: draw paddle bar
+    ; Joy bits
+    lda joy_cia_5bits
+    sta $fc
+    lda joy_cia_5bits+1
+    sta $fd
+    lda joystick1
+    jsr disp_byte_bin5
+
+    lda joy_cia_5bits
+    clc
+    adc #joy2_offset
+    sta $fc
+    lda joy_cia_5bits+1
+    adc #0
+    sta $fd
+    lda joystick2
+    jsr disp_byte_bin5
+
+    ; Joy hex
+    lda joy_cia_hex
+    sta $fc
+    lda joy_cia_hex+1
+    sta $fd
+    lda joystick1
+    jsr disp_byte_hex
+
+    lda joy_cia_hex
+    clc
+    adc #joy2_offset
+    sta $fc
+    lda joy_cia_hex+1
+    adc #0
+    sta $fd
+    lda joystick2
+    jsr disp_byte_hex
+
+    ; Joy basfunc dec
+    lda joy_basfunc_dec
+    sta $fc
+    lda joy_basfunc_dec+1
+    sta $fd
+    lda joystick1
+    jsr calc_joyfunc
+    jsr disp_byte_dec
+
+    lda joy_basfunc_dec
+    clc
+    adc #joy2_offset
+    sta $fc
+    lda joy_basfunc_dec+1
+    adc #0
+    sta $fd
+    lda joystick2
+    jsr calc_joyfunc
+    jsr disp_byte_dec
+
+    ; Paddle numbers
+    lda pad1_val_hex
+    sta $fc
+    lda pad1_val_hex+1
+    sta $fd
+    lda paddle1a
+    jsr disp_byte_hex
+
+    lda pad1_val_hex
+    clc
+    adc #3
+    sta $fc
+    lda pad1_val_hex+1
+    adc #0
+    sta $fd
+    lda paddle1a
+    jsr disp_byte_dec
+
+    lda pad2_val_hex
+    sta $fc
+    lda pad2_val_hex+1
+    sta $fd
+    lda paddle1b
+    jsr disp_byte_hex
+
+    lda pad2_val_hex
+    clc
+    adc #3
+    sta $fc
+    lda pad2_val_hex+1
+    adc #0
+    sta $fd
+    lda paddle1b
+    jsr disp_byte_dec
+
+    lda pad3_val_hex
+    sta $fc
+    lda pad3_val_hex+1
+    sta $fd
+    lda paddle2a
+    jsr disp_byte_hex
+
+    lda pad3_val_hex
+    clc
+    adc #3
+    sta $fc
+    lda pad3_val_hex+1
+    adc #0
+    sta $fd
+    lda paddle2a
+    jsr disp_byte_dec
+
+    lda pad4_val_hex
+    sta $fc
+    lda pad4_val_hex+1
+    sta $fd
+    lda paddle2b
+    jsr disp_byte_hex
+
+    lda pad4_val_hex
+    clc
+    adc #3
+    sta $fc
+    lda pad4_val_hex+1
+    adc #0
+    sta $fd
+    lda paddle2b
+    jsr disp_byte_dec
+
+    ; Paddle bars
+    lda pad1_bar
+    sta $fc
+    lda pad1_bar+1
+    sta $fd
+    lda paddle1a
+    jsr disp_paddle_bar
+
+    lda pad2_bar
+    sta $fc
+    lda pad2_bar+1
+    sta $fd
+    lda paddle1b
+    jsr disp_paddle_bar
+
+    lda pad3_bar
+    sta $fc
+    lda pad3_bar+1
+    sta $fd
+    lda paddle2a
+    jsr disp_paddle_bar
+
+    lda pad4_bar
+    sta $fc
+    lda pad4_bar+1
+    sta $fd
+    lda paddle2b
+    jsr disp_paddle_bar
 
     rts
 
@@ -301,7 +610,7 @@ screen_setup_petscii:
 screen_setup_petscii_end:
 
 display_data:
-!scr "                        joystick and paddle tester v0.1                         "
+!scr "                 joystick and paddle tester v0.1, by dddaaannn                  "
 !scr "                                                                                "
 !scr "                       joystick 1             joystick 2                        "
 !scr "                                                                                "
