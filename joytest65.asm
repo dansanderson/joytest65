@@ -272,7 +272,59 @@ calc_joyfunc:
 
 disp_paddle_bar:
     ; Input: $fc-$fd = screen offset; A = paddle value
-    ; TODO
+    ; TODO: adjust bar size to 37 and positions in the layout! I thought it'd be 43!
+
+    ldx $fc
+    stx $1600
+    ldx $fd
+    stx $1601
+
+    ldz #0
+
+-   cmp #7
+    bcs +
+    ; A<7
+    tax
+    lda #0
+    bra ++
++   ; A>=7
+    ldx #7
+    sec
+    sbc #7
+++  ; X=bar char index, Z=bar pos
+    pha
+    txa
+    asl
+    tay  ; Y=2*x (bar_steps offset)
+
+    lda $1600
+    sta $fc
+    lda $1601
+    sta $fd
+    jsr make_screen_addr
+    lda bar_steps,y    ; A=screen code
+    sta [$fc],z
+
+    lda #$00
+    clc
+    adc $1600
+    sta $fc
+    lda #$f8
+    adc $1601
+    sta $fd
+    lda #$01
+    adc #$00
+    sta $fe
+    lda #$00
+    sta $ff   ; [$fc] = attr address
+    lda bar_steps+1,y  ; A=attr
+    sta [$fc],z
+
+    pla
+    inz
+    cpz #37
+    bne -
+
     rts
 
 
@@ -627,11 +679,11 @@ display_data:
 !scr "                   $dc00: %---00000 $00   $dc01: %---00000 $00                  "
 !scr "                   joy(1): 000            joy(2): 000                           "
 !scr "                                                                                "
-!scr "                                                       pot(n) / $d419 / $d41a   "
-!scr "  paddle 1 (1a): [                                           ] $00 000          "
-!scr "  paddle 2 (1b): [                                           ] $00 000          "
-!scr "  paddle 3 (2a): [                                           ] $00 000          "
-!scr "  paddle 4 (2b): [                                           ] $00 000          "
+!scr "                                                    pot(n) / $d419 / $d41a      "
+!scr "     paddle 1 (1a): [                                     ] $00 000             "
+!scr "     paddle 2 (1b): [                                     ] $00 000             "
+!scr "     paddle 3 (2a): [                                     ] $00 000             "
+!scr "     paddle 4 (2b): [                                     ] $00 000             "
 display_data_end:
 
 display_data_dmajob:
@@ -724,22 +776,22 @@ joy_b5_off: !word (12*80 + 32)
 joy_cia_5bits:   !word (14*80 + 30)
 joy_cia_hex:     !word (14*80 + 37)
 joy_basfunc_dec: !word (15*80 + 27)
-pad1_val_hex:    !word (18*80 + 64)
-pad2_val_hex:    !word (19*80 + 64)
-pad3_val_hex:    !word (20*80 + 64)
-pad4_val_hex:    !word (21*80 + 64)
-pad1_bar:        !word (18*80 + 18)
-pad2_bar:        !word (19*80 + 18)
-pad3_bar:        !word (20*80 + 18)
-pad4_bar:        !word (21*80 + 18)
+pad1_val_hex:    !word (18*80 + 61)
+pad2_val_hex:    !word (19*80 + 61)
+pad3_val_hex:    !word (20*80 + 61)
+pad4_val_hex:    !word (21*80 + 61)
+pad1_bar:        !word (18*80 + 21)
+pad2_bar:        !word (19*80 + 21)
+pad3_bar:        !word (20*80 + 21)
+pad4_bar:        !word (21*80 + 21)
 
 ; Each step is one screen code and one char attr.
 bar_steps:
-!byte $20, $00
-!byte $65, $00
-!byte $74, $00
-!byte $75, $00
-!byte $76, $10
-!byte $6a, $10
-!byte $67, $10
-!byte $20, $10
+!byte $20, $01
+!byte $65, $01
+!byte $74, $01
+!byte $75, $01
+!byte $76, $21
+!byte $6a, $21
+!byte $67, $21
+!byte $20, $21
