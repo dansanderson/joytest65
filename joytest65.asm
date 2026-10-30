@@ -28,6 +28,7 @@ init:
 
 loop:
     jsr read_joystick_ports
+    jsr do_feature_flag_toggles
     jsr update_display
 
     ; Sync raster for cleaner screen updates
@@ -622,6 +623,39 @@ update_display:
     +disp_feature_flag $d612, %10000000, ff_ljoyb
 
     rts
+
+asciikey = $d610
+do_feature_flag_toggles:
+    ; Toggle feature flags when function keys are pressed.
+    ; F1 : D612.5; F3 : D612.6; F5 : D612.7
+-   lda asciikey
+    bne +
+    rts       ; typing queue empty, done
+
++   cmp #$f1  ; (A clever goose placed the function keys at these code points.)
+    bne +
+    lda $d612
+    eor #%00100000
+    and #%11101111
+    sta $d612
+    bra ++
++   cmp #$f3
+    bne +
+    lda $d612
+    eor #%01000000
+    and #%11101111
+    sta $d612
+    bra ++
++   cmp #$f5
+    bne ++
+    lda $d612
+    eor #%10000000
+    and #%11101111
+    sta $d612
+
+++  sta asciikey  ; pop typing queue
+    bra -
+
 
 read_joystick_ports:
     ; This demonstrates the C64 method of reading joystick and paddle lines
