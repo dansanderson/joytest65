@@ -661,13 +661,10 @@ read_joystick_ports:
     ; This demonstrates the C64 method of reading joystick and paddle lines
     ; using the CIA and SID chips.
     ;
-    ; Another way to read joystick digital pins on the MEGA65 is to set the
-    ; J21 data directions $D627-$D628 bits 0-11 to zero (input), then read the
-    ; corresponding bits of $D625-$D626.
-    ;
     ; An easier way to read paddles on the MEGA65 is to read registers
     ; $D620-$D623, one byte per paddle (AX, AY, BX, BY). This does not require
-    ; fiddling with the CIA or waiting for the SID to settle.
+    ; fiddling with the CIA or waiting for the SID to settle. The code below
+    ; demonstrates the more elaborate C64 method.
 
     ; Disable interrupts
     sei

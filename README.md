@@ -8,7 +8,8 @@ joytest65 is written using the [Acme cross-assembler](https://sourceforge.net/pr
 
 If you are writing a game in BASIC 65, see the [User's Guide](https://files.mega65.org/?id=a5081244-a976-4a21-9153-27cca13fd613) for information about the `JOY()` and `POT()` functions.
 
-* 2020-10-21, v0.1: Initial release. Lots of sloppy inefficient code, but hopefully the `read_joystick_ports` routine is clear enough.
+* 2026-10-29, v0.2: Added ability to toggle joystick feature flags (swap, rotate). Added on-screen hints and source comments for other ways to read joysticks and paddles. No changes to `read_joystick_ports`, but it would be easy to revise that routine to try the alternate methods.
+* 2024-10-21, v0.1: Initial release. Lots of sloppy inefficient code, but hopefully the `read_joystick_ports` routine is clear enough.
 
 ## One-button joysticks
 
@@ -54,7 +55,11 @@ Each paddle dial is also assigned to a pin. The dial is a *potentiometer,* an el
 
 To read the paddle fire buttons, use the same procedure as with joysticks.
 
-To read the paddle dials:
+There are two methods of reading paddles on the MEGA65: via MEGA65 exclusive registers, or the original Commodore 64 method.
+
+To use the MEGA65 exclusive paddle registers, simply read a byte value for each paddle: $D620 for port 1 paddle A (POTX), $D621 for port 1 paddle B (POTY), $D622 for port 2 paddle A (POTX), and $D623 for port 2 paddle B.
+
+The Commodore 64 method is more elaborate. To read the paddle dials with the original Commodore 64 method:
 
 1. Select the joystick port by writing to $DC00 bits 6-7: %01000000 for port 1, and %10000000 for port 2.
 2. Wait 512 machine cycles at 1 MHz so that the computer can read the resistance value.
@@ -101,6 +106,12 @@ To build joytest65, use Acme assembler:
 
 ```
 acme joytest65.asm
+```
+
+Alternatively, use GNU Make with the provided `Makefile`:
+
+```
+make
 ```
 
 ## TODO
