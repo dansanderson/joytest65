@@ -112,6 +112,68 @@ disp:
 ++
 }
 
+!macro disp_feature_flag val, mask, locptr {
+    ; Determine "on " or "off"
+    ; X=string offset; Y=attr
+    lda val
+    and #mask
+    beq +
+    ldx #0        ; "on "
+    ldy #$07
+    bra ++
++   ldx #3        ; "off"
+    ldy #$0e
+++
+
+    ; Plot attr: 1.f800 + (locptr), three locations
+    lda #$00
+    clc
+    adc locptr
+    sta $fc
+    lda #$f8
+    adc locptr+1
+    sta $fd
+    lda #$01
+    adc #$00
+    sta $fe
+    lda #$00
+    sta $ff   ; [$fc] = attr address
+    tya
+    ldz #0
+    sta [$fc],z
+    inz
+    sta [$fc],z
+    inz
+    sta [$fc],z
+
+    ; Plot word: from ff_on,x to [$d060] + (locptr), three locations
+    lda $d060
+    clc
+    adc locptr
+    sta $fc
+    lda $d061
+    adc locptr+1
+    sta $fd
+    lda $d062
+    adc #$00
+    sta $fe
+    lda $d063
+    and #$0f
+    sta $ff   ; [$fc] = attr address
+    lda ff_on,x
+    ldz #0
+    sta [$fc],z
+    inx
+    lda ff_on,x
+    inz
+    sta [$fc],z
+    inx
+    lda ff_on,x
+    inz
+    sta [$fc],z
+}
+
+
 make_screen_addr:
     ; Input: $fc-$fd: screen offset
     ; Output: $fc-$ff: screen address + offset
@@ -554,9 +616,25 @@ update_display:
     lda paddle2b
     jsr disp_paddle_bar
 
+    ; Feature flags
+    +disp_feature_flag $d612, %00100000, ff_joyswap
+    +disp_feature_flag $d612, %01000000, ff_ljoya
+    +disp_feature_flag $d612, %10000000, ff_ljoyb
+
     rts
 
 read_joystick_ports:
+    ; This demonstrates the C64 method of reading joystick and paddle lines
+    ; using the CIA and SID chips.
+    ;
+    ; Another way to read joystick digital pins on the MEGA65 is to set the
+    ; J21 data directions $D627-$D628 bits 0-11 to zero (input), then read the
+    ; corresponding bits of $D625-$D626.
+    ;
+    ; An easier way to read paddles on the MEGA65 is to read registers
+    ; $D620-$D623, one byte per paddle (AX, AY, BX, BY). This does not require
+    ; fiddling with the CIA or waiting for the SID to settle.
+
     ; Disable interrupts
     sei
 
@@ -662,7 +740,8 @@ screen_setup_petscii:
 screen_setup_petscii_end:
 
 display_data:
-!scr "                 joystick and paddle tester v0.1, by dddaaannn                  "
+;     01234567890123456789012345678901234567890123456789012345678901234567890123456789
+!scr "                 joystick and paddle tester v0.2, by dddaaannn                  "
 !scr "                                                                                "
 !scr "                       joystick 1             joystick 2                        "
 !scr "                                                                                "
@@ -680,10 +759,14 @@ display_data:
 !scr "                   joy(1): 000            joy(2): 000                           "
 !scr "                                                                                "
 !scr "                                                    pot(n) / $d419 / $d41a      "
-!scr "     paddle 1 (1a): [                                     ] $00 000             "
-!scr "     paddle 2 (1b): [                                     ] $00 000             "
-!scr "     paddle 3 (2a): [                                     ] $00 000             "
-!scr "     paddle 4 (2b): [                                     ] $00 000             "
+;                          0123456789012345678901234567890123456
+!scr "     paddle 1 (1a): [                                     ] $00 000  ($d620)    "
+!scr "     paddle 2 (1b): [                                     ] $00 000  ($d621)    "
+!scr "     paddle 3 (2a): [                                     ] $00 000  ($d622)    "
+!scr "     paddle 4 (2b): [                                     ] $00 000  ($d623)    "
+!scr "                                                                                "
+;     01234567890123456789012345678901234567890123456789012345678901234567890123456789
+!scr "     ($d612 5-7:)  joy swap [f1]: off  rotate 180: j1 [f3] off, j2 [f5] off     "
 display_data_end:
 
 display_data_dmajob:
@@ -795,3 +878,11 @@ bar_steps:
 !byte $6a, $21
 !byte $67, $21
 !byte $20, $21
+
+; Start of "off"/"on" for each feature flag
+; - uint16: Screen memory offset (joy 1)
+ff_joyswap:      !word (23*80 + 34)
+ff_ljoya:        !word (23*80 + 59)
+ff_ljoyb:        !word (23*80 + 72)
+ff_on:           !scr "on "
+ff_off:          !scr "off"
